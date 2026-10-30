@@ -12,9 +12,9 @@ Durata pentru student: aproximativ 45–50 de minute, individual. Restul orei se
 | `profesor.html` | Zona profesorului (rezultate, discrepanțe, nevoi, export) |
 | `content.js` | Conținutul: spitalul, cele 22 de enunțuri, cele 4 profiluri de pacient |
 | `cheie.js` | Material doar pentru profesor: neconformitățile introduse intenționat și ghidul de dezbatere |
-| `config.js` | Configurare (adresa colectorului, codul de sesiune) |
+| `config.js` | Configurare: pacientul ales, adresa scriptului Google, opțional linkul unui Google Form |
 | `demo.js` | Date demonstrative fictive (48 de studenți) |
-| `Code.gs` | Colectorul Google Sheets (opțional, dar recomandat) |
+| `Code.gs` | Scriptul care primește rezultatele în foaia ta Google Sheets |
 | `style.css`, `core.js`, `app.js`, `teacher.js` | Aspectul, calculele SERVQUAL și logica celor două pagini |
 
 Toate fișierele stau la același nivel, fără subfoldere.
@@ -28,7 +28,7 @@ Toate fișierele stau la același nivel, fără subfoldere.
 5. **Parcursul** pas cu pas (6 momente), cu nota de la 1 la 5 pentru cum s-a simțit la fiecare moment, și o **fișă de parcurs** cu timpii de așteptare față de timpul de îngrijire efectivă.
 6. **Percepțiile** (aceleași 22 de enunțuri, despre Spitalul Calitas) și două întrebări globale (mulțumire, recomandare 0–10).
 7. **Rezultatele proprii**: IPCS, radar, discrepanțe pe dimensiuni, cele mai mari deficite.
-8. **Trimitere** către profesor.
+8. **Trimitere** către profesor, cu un singur buton (sau, ca rezervă, printr-un cod de rezultat).
 
 După începerea parcursului, așteptările nu mai pot fi modificate, iar după afișarea rezultatelor nu mai pot fi modificate nici percepțiile. Așa evaluarea nu este influențată retroactiv.
 
@@ -38,7 +38,9 @@ După începerea parcursului, așteptările nu mai pot fi modificate, iar după 
 
 ## Zona profesorului (`profesor.html`)
 
-Rezultatele sunt organizate pe file (Sinteză, Enunțuri, Prioritizare, Profiluri și parcurs, Nevoi și acțiuni, Studenți, Cheia scenariului, Dezbatere, Export). Butonul **Mod prezentare** mărește textul și ascunde panoul de încărcare, pentru proiector.
+Rezultatele sunt organizate pe file (Concluzii pentru clasă, Sinteză, Enunțuri, Prioritizare, Profiluri și parcurs, Nevoi și acțiuni, Studenți, Cheia scenariului, Dezbatere, Export). Butonul **Mod prezentare** mărește textul, ascunde panoul de încărcare și ascunde fila Studenți (singura cu nume), ca să poți proiecta fără grijă.
+
+**Concluzii pentru clasă** este fila de arătat studenților la final: IPCS-ul grupei, radarul așteptări față de percepții, unde a greșit spitalul, ce a mers bine, momentele adevărului, «aceeași experiență, evaluări diferite», ce ar trebui să facă spitalul și concluzia SERVQUAL. Nu conține niciun nume.
 
 - Indicatori: IPCS (și varianta ponderată cu importanța), grad de satisfacție, NPS, timp de completare.
 - Radar așteptări față de percepții, diferențele pe dimensiuni și pe cele 22 de enunțuri, distribuția IPCS.
@@ -68,20 +70,35 @@ Aplicația mai conține trei pacienți, pregătiți pentru alți ani sau alte gr
 
 **Atenție:** un depozit public poate fi citit de oricine, deci și studenții pot deschide `cheie.js`. Dacă nu vrei asta, nu încărca fișierul pe GitHub și păstrează-l doar pe calculatorul tău. Zona profesorului funcționează și fără el.
 
-## Colectarea răspunsurilor (Google Sheets)
+## Colectarea răspunsurilor: direct în Google Sheets
 
-GitHub Pages găzduiește doar pagini statice, deci pentru ca răspunsurile să ajungă la tine este nevoie de un colector. Cel inclus este gratuit și folosește contul tău Google.
+Studentul apasă **Trimite rezultatele** și răspunsurile lui apar ca un rând nou în foaia ta Google Sheets. În zona profesorului, rezultatele se actualizează singure la fiecare 30 de secunde (sau când apeși **Actualizează**). Foaia rămâne privată: o citești doar tu, cu cheia ta.
 
-1. Creează o foaie Google Sheets nouă.
-2. **Extensii → Apps Script**, șterge conținutul și lipește `Code.gs`.
-3. Rulează funcția `setup` o dată (acceptă autorizările). În **Vizualizare → Jurnal de execuție** apare cheia profesorului generată. Ca să folosești o cheie proprie sau un cod de sesiune: **Setări proiect → Proprietăți script**, adaugă `TEACHER_KEY` (și, opțional, `SESSION_CODE`).
-4. **Implementare → Implementare nouă → Aplicație web**, *Execută ca: eu*, *Cine are acces: oricine*. Copiază adresa care se termină în `/exec`.
-5. În `config.js` pune adresa la `endpoint`. Dacă vrei cod de sesiune, setează `cerCodSesiune: true` și anunță codul la oră.
-6. La orice modificare ulterioară a scriptului trebuie creată o implementare nouă (versiune nouă).
+### Configurare, o singură dată (aproximativ 10 minute)
 
-Răspunsurile apar în foaia **Raspunsuri**, câte un rând pe student, cu A1–A22, P1–P22 și importanțele pe coloane, deci le poți folosi direct în Excel. Dacă un student retrimite, rândul lui se actualizează, nu se dublează. În `profesor.html` introduci cheia și apeși **Încarcă din Google Sheets**.
+Folosește un **cont Google personal** (Gmail). Conturile instituționale blochează adesea opțiunea „Oricine” de la pasul 5, iar atunci studenții nu pot trimite.
 
-**Fără server:** lasă `endpoint` gol. Studentul descarcă un fișier `.json` la final și ți-l trimite, iar tu tragi toate fișierele în zona profesorului.
+1. Creează o foaie Google Sheets nouă, de exemplu „Calitas, rezultate”.
+2. În foaie: **Extensii → Apps Script**. Șterge tot ce e în editor, lipește conținutul fișierului `Code.gs` și salvează (pictograma dischetă).
+3. În bara de sus alege funcția **setup** și apasă **Rulează**. Google cere autorizare: alege contul tău, apoi **Avansat → Accesează proiectul (nesigur)** și **Permite**. Avertismentul apare pentru orice script personal, nu doar pentru acesta.
+4. Jos, în **Jurnalul de execuție**, apare **cheia profesorului** (10 caractere). Noteaz-o.
+5. **Implementare → Implementare nouă →** rotița → **Aplicație web**. La *Execută ca* alege **Eu**, la *Cine are acces* alege **Oricine**. Apasă **Implementează** și copiază **adresa aplicației web** (se termină în `/exec`).
+6. În `config.js`, lipește adresa la `endpoint`, între ghilimele. Urcă `config.js` din nou pe GitHub.
+7. Deschide zona profesorului, introdu cheia o singură dată și apasă **Încarcă rezultatele**. Calculatorul ține minte cheia.
+
+Înainte de oră, fă o probă: completează tu aplicația ca student, trimite, apoi verifică foaia și zona profesorului.
+
+Dacă modifici ulterior `Code.gs`, trebuie **Implementare → Gestionează implementările → Editează → Versiune nouă**; altfel rămâne activă versiunea veche.
+
+### Ce vezi în foaie
+
+Foaia **Raspunsuri** are câte un rând pe student: nume, grupă, IPCS, A1–A22, P1–P22, importanțele, **codul de rezultat** și datele complete. Dacă un student retrimite, rândul lui se actualizează, nu se dublează.
+
+### Plasa de siguranță: codul de rezultat
+
+Dacă trimiterea nu merge pentru un student (rețea blocată, de exemplu), el deschide „Nu merge trimiterea? Folosește codul de rezultat”, copiază codul (începe cu `CAL1.`) și ți-l trimite pe orice cale. Tu îl lipești în zona profesorului, la **Coduri trimise pe altă cale**. Codul are sumă de control, deci unul copiat greșit e respins. Observațiile scrise la momente nu intră în cod.
+
+**Fără niciun script:** dacă lași `endpoint` gol, aplicația folosește doar codurile. Poți crea un Google Form cu o întrebare („Codul tău de rezultat”), pune linkul lui în `config.js` la `linkFormular`, iar la final copiezi coloana cu coduri din foaia formularului și o lipești în zona profesorului.
 
 ## Modificarea conținutului
 
@@ -92,4 +109,4 @@ Totul se află în `content.js`: textele celor 22 de enunțuri (`{S}`, `{s}`, `{
 - **IPCS** este calculat ca media diferențelor (percepție − așteptare) pe cele 5 dimensiuni, deoarece formula nu era păstrată în fișierul Excel încărcat (celulele conțineau doar valori). Dacă folosești la curs altă formulă, se modifică în `core.js`, funcția `analyze`.
 - Colectorul Google acceptă trimiteri de la oricine are adresa; protecția este validarea datelor și, opțional, codul de sesiune. Datele se citesc doar cu cheia profesorului.
 - Numele studenților sunt vizibile profesorului. Informează studenții despre prelucrare, conform politicii facultății. Nu se colectează date medicale reale; toate cazurile sunt fictive.
-- Aplicația a fost verificată automat (calcule, parcurgerea completă a fluxului studentului, trimiterea către colector, zona profesorului) și vizual, în Chromium, pe calculator și pe telefon. Nu a fost testată în Safari pe iPhone; merită o încercare înainte de oră.
+- Aplicația a fost verificată automat (calcule, parcurgerea completă a fluxului studentului, codurile de rezultat, zona profesorului) și vizual, în Chromium, pe calculator și pe telefon. Scriptul `Code.gs` a fost testat cu serviciile Google simulate, nu pe un cont Google real; de aceea proba de dinainte de oră (secțiunea de configurare) este importantă. Nu a fost testată în Safari pe iPhone.

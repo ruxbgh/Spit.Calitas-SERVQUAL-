@@ -337,22 +337,35 @@
   R.send = function () {
     var pe = profile().persona, miss = firstMissing();
     var mins = Math.round((S.dur.total || 0) / 60);
-    var h = '<div class="card signed"><div class="kicker">Ultimul pas</div><h2>Trimite rezultatele</h2>' +
+    var h = '<div class="card signed"><div class="kicker">Ultimul pas</div><h2>Trimite rezultatele profesorului</h2>' +
       '<p><b>' + esc(S.student.prenume + ' ' + S.student.nume) + '</b>, ' + esc(S.student.grupa) + '. Ai fost ' + esc(pe.nume) + '. Timp activ: ' + mins + ' minute.</p>';
     if (miss) {
-      h += '<div class="alertbox">Mai ai de completat: <b>' + esc(miss.msg) + '</b> <button class="btn small" data-goto="' + miss.step + '" style="margin-left:8px">Mergi acolo</button></div>';
+      return h + '<div class="alertbox">Mai ai de completat: <b>' + esc(miss.msg) + '</b> <button class="btn small" data-goto="' + miss.step + '" style="margin-left:8px">Mergi acolo</button></div></div>';
     }
-    if (S.sent) {
-      h += '<div class="infobox"><b>' + (S.sentConfirmed ? 'Rezultatele au fost trimise profesorului.' : 'Trimiterea a fost făcută, dar serverul nu a confirmat.') + '</b> ' + esc(S.sentAt || '') +
-        (S.sentConfirmed ? '' : ' Descarcă fișierul și trimite-l profesorului, ca să fii sigur că ajunge.') + '</div>';
+    var code = K.encodeCode(payload());
+    var steps = '<ol class="sendsteps">' +
+      '<li><b>Copiază codul tău de rezultat.</b> Conține numele tău și toate răspunsurile.' +
+      '<textarea class="codebox" id="codebox" readonly rows="3" aria-label="Codul tău de rezultat">' + esc(code) + '</textarea>' +
+      '<button class="btn primary" id="btn-copy">Copiază codul</button> <span class="copied" id="copied" role="status"></span></li>' +
+      '<li><b>Lipește-l în formularul profesorului.</b> ' + (CFG.linkFormular
+        ? 'Formularul are o singură întrebare: codul.<br><a class="btn go" id="btn-form" href="' + esc(CFG.linkFormular) + '" target="_blank" rel="noopener">Deschide formularul</a>'
+        : 'Profesorul îți spune unde: formular, e-mail sau platforma facultății.') + '</li></ol>';
+    if (CFG.endpoint) {
+      if (S.sent && S.sentConfirmed) {
+        h += '<div class="sentok"><svg viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="36" fill="#def1e6"/><path d="M24 41l11 11 21-24" fill="none" stroke="#2c7a57" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Rezultatele tale au ajuns la profesor.</b><br><span class="muted small">Trimise la ' + esc(S.sentAt || '') + '. Nu mai trebuie să faci nimic.</span></div></div>';
+      } else {
+        h += '<p>Apasă butonul de mai jos: rezultatele ajung direct la profesor.</p><button class="btn go big" id="btn-send">Trimite rezultatele</button>' +
+          (S.sent ? '<div class="waitbox" style="margin-top:14px">Trimiterea nu a fost confirmată. Încearcă din nou sau folosește codul de mai jos.</div>' : '');
+      }
+      h += '<p class="status" id="status" role="status"></p>' +
+        '<details class="fallback"' + (S.sent && !S.sentConfirmed ? ' open' : '') + '><summary>Nu merge trimiterea? Folosește codul de rezultat</summary>' + steps + '</details>';
+    } else {
+      h += steps;
     }
-    h += '<div class="nav" style="justify-content:flex-start">';
-    if (CFG.endpoint) h += '<button class="btn primary" id="btn-send"' + (miss ? ' disabled' : '') + '>' + (S.sent ? 'Retrimite' : 'Trimite rezultatele') + '</button>';
-    h += '<button class="btn' + (CFG.endpoint ? '' : ' primary') + '" id="btn-dl">Descarcă fișierul cu rezultate</button><button class="btn" id="btn-print">Tipărește</button></div>';
-    if (!CFG.endpoint) h += '<div class="waitbox" style="margin:16px 0 0">Trimite fișierul descărcat profesorului, pe e-mail sau pe platforma facultății.</div>';
-    h += '<p class="status" id="status" role="status"></p></div>' +
-      '<div class="card done-card"><svg viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="36" fill="#def1e6"/><path d="M24 41l11 11 21-24" fill="none" stroke="#2c7a57" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-      '<h2>Mulțumim, ' + esc(S.student.prenume) + '!</h2><p style="margin:0 auto">În clasă discutăm rezultatele grupului și discrepanțele găsite la Spitalul Calitas. Păstrează-ți rezultatele pentru discuție.</p></div>';
+    h += '<p class="small muted" style="margin:14px 0 0">Altă variantă: <a href="#" id="btn-dl">descarcă fișierul cu rezultate</a> sau <a href="#" id="btn-print">tipărește pagina</a>.</p>' +
+      (CFG.endpoint ? '' : '<p class="status" id="status" role="status"></p>') + '</div>' +
+      ((CFG.endpoint && !(S.sent && S.sentConfirmed)) ? '' : '<div class="card done-card"><svg viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="36" fill="#def1e6"/><path d="M24 41l11 11 21-24" fill="none" stroke="#2c7a57" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      '<h2>Mulțumim, ' + esc(S.student.prenume) + '!</h2><p style="margin:0 auto">După ce trimite toată grupa, profesorul vă arată concluziile SERVQUAL pentru Spitalul Calitas.</p></div>');
     return h;
   };
 
@@ -531,14 +544,16 @@
   }
 
   app.addEventListener('click', function (e) {
-    var t = e.target.closest('button');
+    var t = e.target.closest('button, a#btn-dl, a#btn-print');
     if (!t) return;
+    if (t.tagName === 'A') e.preventDefault();
     if (t.id === 'btn-next') goNext();
     else if (t.id === 'btn-back') { S.step = Math.max(S.step - 1, minStep(screens())); render(); }
     else if (t.dataset.goto) { S.step = +t.dataset.goto; render(); }
     else if (t.id === 'btn-dl') downloadCopy();
     else if (t.id === 'btn-print') window.print();
     else if (t.id === 'btn-send') send();
+    else if (t.id === 'btn-copy') copyCode();
   });
 
   rail.addEventListener('click', function (e) {
@@ -561,6 +576,15 @@
       dur: S.dur, rez: { ipcs: a.ipcs, ipcsW: a.ipcsW, sat: a.sat }, versiune: C.versiune
     };
   }
+  function payloadWithCode() { var p = payload(); p.code = K.encodeCode(p); return p; }
+  function copyCode() {
+    var box = document.getElementById('codebox'), note = document.getElementById('copied');
+    var done = function () { if (note) note.textContent = 'Copiat. Acum lipește-l în formular.'; };
+    box.focus(); box.select();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(box.value).then(done, function () { try { document.execCommand('copy'); done(); } catch (e) { if (note) note.textContent = 'Selectează codul și copiază-l cu Ctrl+C.'; } });
+    } else { try { document.execCommand('copy'); done(); } catch (e) { if (note) note.textContent = 'Selectează codul și copiază-l cu Ctrl+C.'; } }
+  }
   function setStatus(msg) { var el = document.getElementById('status'); if (el) el.textContent = msg; }
   function downloadCopy() {
     var p = payload();
@@ -572,7 +596,7 @@
   }
   function send() {
     if (firstMissing()) { render(true); return; }
-    var body = JSON.stringify(payload()), btn = document.getElementById('btn-send');
+    var body = JSON.stringify(payloadWithCode()), btn = document.getElementById('btn-send');
     if (btn) btn.disabled = true;
     setStatus('Se trimite…');
     fetch(CFG.endpoint, { method: 'POST', body: body, redirect: 'follow' })

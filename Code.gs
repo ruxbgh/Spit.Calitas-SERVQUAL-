@@ -17,6 +17,7 @@ function header_() {
   for (i = 1; i <= 22; i++) h.push('A' + i);
   for (i = 1; i <= 22; i++) h.push('P' + i);
   DIMS.forEach(function (d) { h.push('imp_' + d); });
+  h.push('cod');
   h.push('json');
   return h;
 }
@@ -73,6 +74,7 @@ function upsert_(d) {
     d.global ? d.global.sat : '', d.global ? d.global.nps : ''];
   row = row.concat(d.exp, d.per);
   DIMS.forEach(function (k) { row.push(d.imp[k]); });
+  row.push(String(d.code || ''));
   row.push(JSON.stringify(d));
 
   var last = sh.getLastRow(), target = 0;

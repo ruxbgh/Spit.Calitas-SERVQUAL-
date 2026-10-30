@@ -27,21 +27,35 @@
     ALL = Object.keys(map).map(function (k) { return map[k]; });
     return bad;
   }
-  function loadSheet() {
-    var ep = $('endpoint').value.trim() || CFG.endpoint, key = $('tkey').value.trim();
-    if (!ep) { setStatus('Introdu adresa colectorului Apps Script (sau setează-o în config.js).', true); return; }
-    if (!key) { setStatus('Introdu cheia profesorului.', true); return; }
+  var KEY_KEY = 'calitas_teacher_key', lastUpdate = null, loading = false;
+  function loadSheet(silent) {
+    var ep = $('endpoint').value.trim() || CFG.endpoint, key = $('tkey').value.trim() || K.store.get(KEY_KEY) || '';
+    if (!ep) { if (!silent) setStatus('Introdu adresa colectorului Apps Script (sau setează-o în config.js).', true); return; }
+    if (!key) { if (!silent) setStatus('Introdu cheia profesorului.', true); return; }
+    if (loading) return;
+    loading = true;
     K.store.set(EP_KEY, ep);
-    setStatus('Se încarcă…');
-    fetch(ep + (ep.indexOf('?') < 0 ? '?' : '&') + 'action=list&key=' + encodeURIComponent(key))
+    if (!silent) setStatus('Se încarcă…');
+    fetch(ep + (ep.indexOf('?') < 0 ? '?' : '&') + 'action=list&key=' + encodeURIComponent(key) + '&t=' + Date.now())
       .then(function (r) { return r.json(); })
       .then(function (j) {
-        if (!j || !j.ok) throw new Error((j && j.error) || 'răspuns invalid');
-        var bad = addRecords(j.rows, true);
-        setStatus(ALL.length + ' răspunsuri încărcate' + (bad ? ' (' + bad + ' ignorate: format invalid)' : '') + '.');
-        render();
+        loading = false;
+        if (!j || !j.ok) throw new Error(j && j.error === 'cheie invalidă' ? 'cheia nu este corectă' : ((j && j.error) || 'răspuns invalid'));
+        K.store.set(KEY_KEY, key);
+        ALL = ALL.filter(function (r) { return String(r.id).indexOf('demo') !== 0; });
+        var before = ALL.length, bad = addRecords(j.rows, false);
+        lastUpdate = new Date();
+        live = true;
+        var added = ALL.length - before;
+        setStatus(ALL.length + ' răspunsuri' + (added > 0 && before ? ' (' + (added === 1 ? 'unul nou' : added + ' noi') + ')' : '') + (bad ? ', ' + bad + ' ignorate (format invalid)' : '') + '.');
+        var y = window.scrollY; render(); window.scrollTo(0, y);
       })
-      .catch(function (e) { setStatus('Nu s-au putut încărca datele: ' + e.message, true); });
+      .catch(function (e) { loading = false; setStatus('Nu s-au putut încărca datele: ' + e.message + '. Verifică adresa, cheia și conexiunea.', true); });
+  }
+  var live = false, autoTimer = null;
+  function setAuto(on) {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    if (on) autoTimer = setInterval(function () { if (document.visibilityState === 'visible') loadSheet(true); }, 30000);
   }
   function loadFiles(files) {
     var list = Array.prototype.slice.call(files || []), pending = list.length, bad = 0;
@@ -149,8 +163,8 @@
       });
       F.push({ k: '', t: '<b>Profilurile de pacient diferă cel mai mult la ' + esc(best.d.nume) + '.</b> De la ' + fmtS(best.lo.v) + ' (' + esc(best.lo.p.eticheta) + ') la ' + fmtS(best.hi.v) + ' (' + esc(best.hi.p.eticheta) + '). Folosiți diferența ca punct de plecare pentru discuția despre fluxuri diferite de pacienți.' });
     }
-    if (single() && g.n >= 5) {
-      var sp = g.item.slice().sort(function (a, b) { return b.sdP - a.sdP; })[0];
+    var sp = g.item.slice().sort(function (a, b) { return b.sdP - a.sdP; })[0];
+    if (single() && g.n >= 5 && sp.maxP - sp.minP >= 2) {
       F.push({ k: '', t: '<b>Aceeași experiență, evaluări diferite.</b> Toți studenții au trăit același parcurs, dar la enunțul ' + sp.n + ' («' + esc(C.items[sp.n - 1].s) + '») percepțiile merg de la ' + sp.minP + ' la ' + sp.maxP + ' (σ = ' + fmt(sp.sdP) + '). Diferența nu vine din serviciu, ci din cum l-a interpretat fiecare: exact ideea calității percepute.' });
     }
     if (g.detect != null) {
@@ -174,8 +188,8 @@
       (single() ? '</div>' : '<label class="f">Profil de pacient<select class="flt" data-f="profil"><option value="">Toate profilurile</option>' +
       C.profiles.map(function (p) { return '<option' + (filt.profil === p.id ? ' selected' : '') + ' value="' + p.id + '">' + esc(p.eticheta) + '</option>'; }).join('') + '</select></label></div>');
   }
-  var TABS = [['sinteza', 'Sinteză'], ['enunturi', 'Enunțuri'], ['prioritati', 'Prioritizare'], ['profiluri', 'Profiluri și parcurs'], ['nevoi', 'Nevoi și acțiuni'], ['studenti', 'Studenți'], ['cheie', 'Cheia scenariului'], ['dezbatere', 'Dezbatere'], ['export', 'Export']];
-  var tab = 'sinteza';
+  var TABS = [['concluzii', 'Concluzii pentru clasă'], ['sinteza', 'Sinteză'], ['enunturi', 'Enunțuri'], ['prioritati', 'Prioritizare'], ['profiluri', 'Profiluri și parcurs'], ['nevoi', 'Nevoi și acțiuni'], ['studenti', 'Studenți'], ['cheie', 'Cheia scenariului'], ['dezbatere', 'Dezbatere'], ['export', 'Export']];
+  var tab = 'concluzii';
   function nav() {
     return '<nav class="tnav noprint" role="tablist" aria-label="Secțiunile raportului">' + TABS.map(function (x) {
       return '<button role="tab" data-tab="' + x[0] + '" aria-selected="' + (tab === x[0]) + '">' + (x[0] === 'profiluri' && single() ? 'Parcursul pacientului' : x[1]) + '</button>';
@@ -184,6 +198,59 @@
   function showTab() {
     dash.querySelectorAll('section.tsec').forEach(function (s) { s.hidden = s.id !== tab; });
     dash.querySelectorAll('[data-tab]').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === tab)); });
+  }
+
+  /* Concluzii pentru clasă: fără nume, de proiectat după ce grupa a trimis codurile */
+  function secConcluzii(g, recs) {
+    var dims = C.dimensions.slice().sort(function (a, b) { return g.gap[a.id] - g.gap[b.id]; });
+    var w1 = dims[0], w2 = dims[1], best = dims[dims.length - 1];
+    var negDims = dims.filter(function (d) { return g.gap[d.id] < 0; }).length;
+    var b = K.band(g.ipcs), one = single();
+    var who = one ? 'voastră ca ' + esc(one.persona.nume) : 'pacienților voștri';
+    var worstItems = g.item.slice().sort(function (a, b) { return a.gap - b.gap; }).slice(0, 3);
+    var bestItems = g.item.slice().sort(function (a, b) { return b.gap - a.gap; }).slice(0, 2);
+    var li = function (it) {
+      return '<li><span class="g ' + (it.gap < -0.05 ? 'neg' : 'pos') + '">' + fmtS(it.gap, 1) + '</span><div>' + esc(K.itemText(C.items[it.n - 1], 'P')) +
+        '<br><span class="muted small">Așteptare medie ' + fmt(it.A, 1) + ', percepție medie ' + fmt(it.P, 1) + '</span></div></li>';
+    };
+    var h = '<section class="tsec" id="concluzii"><h2>Concluzia SERVQUAL pentru Spitalul Calitas</h2>' +
+      '<div class="card signed"><div class="cc-hero"><div><p class="muted" style="margin:0">IPCS-ul grupei (' + g.n + ' ' + (g.n === 1 ? 'student' : 'studenți') + ')</p>' +
+      '<div class="bignum ' + (g.ipcs < 0 ? 'neg' : 'pos') + '">' + fmtS(g.ipcs) + '</div><span class="tag ' + b.k + '">' + esc(b.t) + '</span>' +
+      '<p class="lead" style="margin-top:16px">' + (g.ipcs < 0
+        ? 'Experiența ' + who + ' a rămas sub așteptări la ' + negDims + ' din 5 dimensiuni. Cea mai mare distanță între ce ați așteptat și ce ați trăit este la <b>' + esc(w1.nume) + '</b> (' + fmtS(g.gap[w1.id]) + ').'
+        : 'În medie, spitalul a atins așteptările grupei.') + '</p>' +
+      '<p class="muted" style="margin:0">Percepțiile reprezintă ' + fmt(g.sat, 0) + '% din așteptări.' + (!isNaN(g.nps) ? ' Indicele de recomandare (NPS): ' + fmtS(g.nps, 0) + '.' : '') + '</p></div>' +
+      '<div>' + K.radar([{ name: 'Ce ați așteptat', cls: 'a', v: g.A }, { name: 'Ce ați trăit', cls: 'p', v: g.P }]) + '</div></div></div>';
+    h += '<div class="cc-grid"><div>' +
+      '<div class="cc-card bad"><h3><i></i>Unde a greșit spitalul</h3><p>' + esc(w1.nume) + ' (' + fmtS(g.gap[w1.id]) + ') și ' + esc(w2.nume) + ' (' + fmtS(g.gap[w2.id]) + '). Enunțurile cu cea mai mare discrepanță:</p><ol class="gaplist">' + worstItems.map(li).join('') + '</ol></div>' +
+      '<div class="cc-card good"><h3><i></i>Ce a mers bine</h3><p>Dimensiunea ' + esc(best.nume) + ' a rămas cel mai aproape de așteptări (' + fmtS(g.gap[best.id]) + ').</p><ol class="gaplist">' + bestItems.map(li).join('') + '</ol></div>' +
+      '</div><div>';
+    if (one) {
+      var moms = one.momente.map(function (m) {
+        var v = recs.map(function (r) { return r.momente && r.momente[m.id] ? r.momente[m.id].r : 0; }).filter(Boolean);
+        return { m: m, v: v.length ? mean(v) : NaN };
+      }).filter(function (x) { return !isNaN(x.v); }).sort(function (a, b) { return a.v - b.v; });
+      if (moms.length) {
+        var lo = moms[0], hi = moms[moms.length - 1];
+        h += '<div class="cc-card info"><h3><i></i>Momentele adevărului</h3><p>' + (hi.v - lo.v >= 0.5
+          ? 'Cel mai greu moment: <b>' + esc(lo.m.titlu) + '</b> (' + fmt(lo.v, 1) + ' din 5' + (lo.m.asteptare ? ', după ' + lo.m.asteptare + ' minute de așteptare' : '') + ').<br>Cel mai bun moment: <b>' + esc(hi.m.titlu) + '</b> (' + fmt(hi.v, 1) + ' din 5).'
+          : 'Ați evaluat toate momentele aproape la fel (în jur de ' + fmt(mean(moms.map(function (x) { return x.v; })), 1) + ' din 5): experiența a fost resimțită uniform, fără un moment care să iasă în evidență.') + '</p>' +
+          '<p class="muted" style="margin:0">Pacientul nu judecă doar actul medical, ci tot drumul prin spital.</p></div>';
+      }
+      var sp = g.item.slice().sort(function (a, b) { return b.sdP - a.sdP; })[0];
+      if (g.n >= 5 && sp.maxP - sp.minP >= 2) {
+        h += '<div class="cc-card info"><h3><i></i>Aceeași experiență, evaluări diferite</h3><p>Toți ați trăit același parcurs, dar la enunțul «' + esc(K.itemText(C.items[sp.n - 1], 'P')) + '» notele voastre merg de la <b>' + sp.minP + '</b> la <b>' + sp.maxP + '</b>.</p><p class="muted" style="margin:0">Calitatea percepută depinde de așteptările și de atenția fiecăruia, nu doar de serviciu.</p></div>';
+      }
+    }
+    h += '<div class="cc-card do"><h3><i></i>Ce ar trebui să facă Spitalul Calitas</h3>' + worstItems.map(function (it) {
+      var d = C.items[it.n - 1];
+      return '<div class="action"><div class="gv neg">' + it.n + '</div><div><b>' + esc(d.s) + '</b><br>' + esc(d.a) + '</div></div>';
+    }).join('') + '</div></div></div>';
+    h += '<div class="cc-lesson">' + (g.gap[best.id] - g.gap[w1.id] >= 0.8
+      ? 'Punctul forte al spitalului (' + esc(best.nume.toLowerCase()) + ') nu compensează deficitul de la ' + esc(w1.nume.toLowerCase()) + '. Calitatea percepută se construiește pe tot parcursul pacientului.'
+      : 'Discrepanțele sunt apropiate între dimensiuni: problema nu e locală, ci ține de sistemul de management al spitalului.') +
+      '<small>Calitatea serviciului = percepții − așteptări. Un spital poate fi competent și bine dotat și totuși să fie perceput slab, dacă nu își respectă promisiunile și nu își informează pacienții.</small></div></section>';
+    return h;
   }
 
   function secSinteza(g, recs, bp) {
@@ -338,20 +405,21 @@
   /* ---------- Randare ---------- */
   function render() {
     if (!ALL.length) {
-      dash.innerHTML = '<div class="card empty"><h2>Nu există încă date</h2><p>Încarcă răspunsurile din Google Sheets, din fișierele descărcate de studenți sau folosește datele demonstrative pentru a vedea cum arată tabloul de bord.</p></div>';
+      dash.innerHTML = '<div class="card empty"><h2>Nu există încă date</h2><p>Lipește codurile trimise de studenți sau încarcă datele demonstrative ca să vezi cum arată rezultatele.</p></div>';
       return;
     }
     var recs = filtered();
     if (!recs.length) { dash.innerHTML = secToolbar() + '<div class="card empty"><p>Niciun răspuns pentru filtrul ales.</p></div>'; return; }
     var g = aggregate(recs), bp = byProfile(recs);
-    dash.innerHTML = nav() + '<div style="height:18px"></div>' + secToolbar() + secSinteza(g, recs, bp) + secEnunturi(g) + secPrioritati(g) + secProfiluri(recs, bp) + secNevoi(g) + secStudenti(recs) + secCheie(recs, g) + secDezbatere() + secExport();
+    dash.innerHTML = nav() + '<div style="height:18px"></div>' + secToolbar() + secConcluzii(g, recs) + secSinteza(g, recs, bp) + secEnunturi(g) + secPrioritati(g) + secProfiluri(recs, bp) + secNevoi(g) + secStudenti(recs) + secCheie(recs, g) + secDezbatere() + secExport();
     showTab();
     connectState();
   }
   function connectState() {
     var box = $('connect');
     box.classList.toggle('loaded', ALL.length > 0);
-    $('loadedmsg').textContent = ALL.length + ' răspunsuri încărcate.';
+    $('loadedmsg').textContent = ALL.length + ' răspunsuri încărcate' + (live && lastUpdate ? ', actualizat la ' + lastUpdate.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '') + '.';
+    $('livebar').hidden = !live;
   }
 
   /* ---------- Evenimente ---------- */
@@ -365,7 +433,7 @@
     var tb = e.target.closest('[data-tab]');
     if (tb) { tab = tb.dataset.tab; showTab(); window.scrollTo(0, 0); return; }
     var pr = e.target.closest('[data-present]');
-    if (pr) { document.body.classList.toggle('present'); pr.textContent = document.body.classList.contains('present') ? 'Ieși din prezentare' : 'Mod prezentare'; return; }
+    if (pr) { document.body.classList.toggle('present'); pr.textContent = document.body.classList.contains('present') ? 'Ieși din prezentare' : 'Mod prezentare'; if (document.body.classList.contains('present') && tab === 'studenti') { tab = 'concluzii'; showTab(); } return; }
     var b = e.target.closest('[data-exp]');
     if (!b) return;
     var recs = filtered();
@@ -373,7 +441,19 @@
     else if (b.dataset.exp === 'json') K.download('calitas_rezultate.json', JSON.stringify(recs, null, 1), 'application/json');
     else window.print();
   });
-  $('btn-load').addEventListener('click', loadSheet);
+  $('btn-load').addEventListener('click', function () { loadSheet(false); });
+  $('btn-refresh').addEventListener('click', function () { loadSheet(false); });
+  $('auto').addEventListener('change', function (e) { setAuto(e.target.checked); K.store.set('calitas_teacher_auto', e.target.checked); });
+  $('btn-codes').addEventListener('click', function () {
+    var found = K.findCodes($('codes').value), recs = [], bad = 0;
+    if (!found.length) { setStatus('Nu am găsit niciun cod. Codurile încep cu CAL1.', true); return; }
+    found.forEach(function (c) { var d = K.decodeCode(c); if (d.rec) recs.push(d.rec); else bad++; });
+    var before = ALL.length;
+    addRecords(recs, false);
+    var dup = recs.length - (ALL.length - before);
+    setStatus(recs.length + ' coduri valide' + (bad ? ', ' + bad + ' invalide (copiate greșit sau incomplet)' : '') + (dup > 0 ? ', ' + dup + ' duplicate sau retrimise (s-a păstrat ultimul)' : '') + '. Total: ' + ALL.length + ' studenți.', bad > 0);
+    render();
+  });
   $('btn-change').addEventListener('click', function () { $('connect').classList.remove('loaded'); });
   $('files').addEventListener('change', function (e) { loadFiles(e.target.files); });
   var drop = $('drop');
@@ -382,11 +462,24 @@
   drop.addEventListener('drop', function (e) { loadFiles(e.dataTransfer.files); });
   $('btn-demo').addEventListener('click', function () {
     if (!window.CALITAS_DEMO) { setStatus('Fișierul demo.js lipsește.', true); return; }
+    live = false; setAuto(false); $('auto').checked = false;
     addRecords(window.CALITAS_DEMO(48), true);
     setStatus('Date demonstrative: ' + ALL.length + ' studenți fictivi.');
     render();
   });
-  $('endpoint').value = K.store.get(EP_KEY) || CFG.endpoint || '';
+  $('endpoint').value = CFG.endpoint || K.store.get(EP_KEY) || '';
+  if (CFG.endpoint) {
+    // Colectorul este configurat: panoul lui devine metoda principală, adresa nu mai trebuie introdusă.
+    $('livepanel').appendChild($('sheetbox'));
+    $('livepanel').hidden = false;
+    $('eplabel').hidden = true;
+    $('advanced').hidden = true;
+    $('codes-title').textContent = 'Coduri trimise pe altă cale (rezervă)';
+    var auto = K.store.get('calitas_teacher_auto');
+    $('auto').checked = auto !== false;
+    if (K.store.get(KEY_KEY)) { $('tkey').value = K.store.get(KEY_KEY); loadSheet(true); setAuto($('auto').checked); }
+    else setAuto($('auto').checked);
+  }
   if (!window.CALITAS_DEMO) { /* butonul rămâne, dar va raporta lipsa fișierului */ }
   render();
 })();

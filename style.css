@@ -294,7 +294,8 @@ table.tbl td.num, table.tbl th.num { text-align: right; font-variant-numeric: ta
 
 /* ---------- Grafice ---------- */
 .chart { width: 100%; height: auto; display: block; font-family: var(--body); }
-.chart.radar { max-width: 440px; margin: 0 auto; }
+.chart.radar { max-width: 480px; margin: 0 auto; }
+.empty p { margin: 0 auto; }
 .chart .ring { fill: none; stroke: var(--line); stroke-width: 1; }
 .chart .spoke, .chart .grid { stroke: var(--line); stroke-width: 1; }
 .chart .zero { stroke: var(--ink); stroke-width: 1.5; }
@@ -443,4 +444,41 @@ body.present .chart .lab, body.present .chart .val { font-size: 13.5px; }
 #connect.loaded .mini { display: flex; }
 #connect.loaded .full { display: none; }
 #connect.loaded { padding: 14px 22px; border-top-width: 1px; }
-#connect.loaded .status { display: none; }
+
+/* Trimiterea prin cod */
+.sendsteps { list-style: none; padding: 0; margin: 16px 0 0; counter-reset: st; display: grid; gap: 14px; }
+.sendsteps li { counter-increment: st; position: relative; padding: 16px 18px 18px 62px; background: var(--paper); border-radius: var(--r); }
+.sendsteps li::before { content: counter(st); position: absolute; left: 16px; top: 15px; width: 32px; height: 32px; border-radius: 50%; background: var(--sign); color: #fff; display: grid; place-items: center; font: 700 1.05rem/1 var(--head); }
+.sendsteps .btn { margin-top: 10px; }
+.codebox { font: 600 .9rem/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace; word-break: break-all; background: #fff; border: 2px dashed var(--sign) !important; margin: 10px 0 0; min-height: 0; resize: none; color: var(--sign-dark); }
+.copied { color: var(--ok); font-weight: 700; margin-left: 8px; }
+
+/* Concluzii pentru clasă */
+.cc-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: center; }
+.cc-hero .lead { font-size: 1.2rem; }
+.cc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.cc-card { background: #fff; border: 1px solid var(--line); border-radius: var(--r); padding: clamp(18px, 3vw, 28px); margin-bottom: 20px; }
+.cc-card h3 { font-size: 1.4rem; display: flex; align-items: center; gap: 10px; }
+.cc-card h3 i { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+.cc-card.bad h3 i { background: var(--alert); }
+.cc-card.good h3 i { background: var(--ok); }
+.cc-card.info h3 i { background: var(--wait); }
+.cc-card.do h3 i { background: var(--sign); }
+.cc-lesson { background: var(--sign); color: #fff; border-radius: 18px; padding: clamp(22px, 4vw, 36px); font: 600 clamp(1.3rem, 2.6vw, 1.8rem)/1.3 var(--head); margin-bottom: 20px; }
+.cc-lesson small { display: block; font: 400 .95rem/1.4 var(--body); opacity: .85; margin-top: 10px; }
+body.present [data-tab="studenti"] { display: none; }
+body.present .cc-card { font-size: 1.05em; }
+@media (max-width: 880px) { .cc-hero, .cc-grid { grid-template-columns: 1fr; } }
+
+.btn.big { font-size: 1.2rem; padding: 18px 34px; }
+.sentok { display: grid; grid-template-columns: 64px 1fr; gap: 16px; align-items: center; background: var(--ok-soft); border-radius: var(--r); padding: 16px 18px; font-size: 1.1rem; }
+.sentok svg { width: 64px; height: 64px; }
+details.fallback { margin-top: 18px; }
+details.fallback summary { cursor: pointer; font-weight: 700; color: var(--sign); }
+.livebar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.livebar label { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; cursor: pointer; }
+.livebar input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--sign); }
+.livepanel { background: var(--sign-soft); border-radius: var(--r); padding: 18px 20px; margin-bottom: 22px; }
+.livepanel .row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+.livepanel label.f { margin: 0; flex: 1; min-width: 220px; }
+[hidden] { display: none !important; }

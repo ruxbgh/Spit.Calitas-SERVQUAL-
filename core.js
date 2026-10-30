@@ -24,12 +24,14 @@
   }
   function fmt(x, d) {
     if (x == null || isNaN(x)) return '–';
-    return x.toFixed(d == null ? 2 : d).replace('.', ',').replace('-', '−');
+    var t = x.toFixed(d == null ? 2 : d);
+    if (/^-0[.,]?0*$/.test(t)) t = t.slice(1);
+    return t.replace('.', ',').replace('-', '−');
   }
   function fmtS(x, d) {
     if (x == null || isNaN(x)) return '–';
     var s = fmt(x, d);
-    return (x > 0 && s.charAt(0) !== '−') ? '+' + s : s;
+    return (x > 0 && s.charAt(0) !== '−' && /[1-9]/.test(s)) ? '+' + s : s;
   }
   function norm(s) {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
@@ -117,7 +119,7 @@
 
   /* ---------- Grafice SVG ---------- */
   function radar(series) {
-    var W = 420, H = 380, cx = 210, cy = 192, R = 125, n = ids.length;
+    var W = 470, H = 380, cx = 235, cy = 192, R = 125, n = ids.length;
     function pt(i, v) {
       var ang = -Math.PI / 2 + i * 2 * Math.PI / n, r = R * (v - 1) / 4;
       return [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
@@ -240,7 +242,49 @@
     return '﻿' + lines.join('\r\n');
   }
 
+  /* ---------- Codul de rezultat ----------
+     Un text scurt pe care studentul îl copiază (de exemplu într-un Google Form), iar profesorul îl lipește
+     în zona lui. Format: CAL1.<date în base64url>.<sumă de control>. Observațiile scrise nu sunt incluse. */
+  function b64e(s) { return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function b64d(s) {
+    s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '=';
+    return decodeURIComponent(escape(atob(s)));
+  }
+  function clean(s) { return String(s || '').replace(/[|~]/g, ' ').trim(); }
+  function encodeCode(rec) {
+    var p = profileById(rec.profil), pi = C.profiles.indexOf(p);
+    var mom = p ? p.momente.map(function (m) { var x = (rec.momente || {})[m.id]; return x && x.r ? x.r : 0; }).join('') : '';
+    var g = rec.global || {};
+    var parts = [pi, clean(rec.student.nume), clean(rec.student.prenume), clean(rec.student.grupa),
+      rec.exp.join(''), rec.per.join(''), ids.map(function (k) { return rec.imp ? rec.imp[k] : 20; }).join(','),
+      mom, g.sat || 0, g.nps >= 0 ? g.nps : -1, rec.dur && rec.dur.total ? Math.round(rec.dur.total / 60) : 0, clean(g.cuvant)];
+    var body = b64e(parts.join('|'));
+    return 'CAL1.' + body + '.' + (hash(body) % 1679616).toString(36);
+  }
+  function decodeCode(code) {
+    var m = /^CAL1\.([A-Za-z0-9_-]+)\.([0-9a-z]{1,4})$/.exec(String(code).trim());
+    if (!m) return { error: 'format' };
+    if ((hash(m[1]) % 1679616).toString(36) !== m[2]) return { error: 'checksum' };
+    var f;
+    try { f = b64d(m[1]).split('|'); } catch (e) { return { error: 'format' }; }
+    if (f.length < 12) return { error: 'format' };
+    var p = C.profiles[+f[0]];
+    var digits = function (s) { return s.split('').map(Number); };
+    var imp = {}; f[6].split(',').forEach(function (v, i) { imp[ids[i]] = +v; });
+    var momente = {};
+    if (p) p.momente.forEach(function (mm, i) { var r = +(f[7].charAt(i) || 0); if (r) momente[mm.id] = { r: r, n: '' }; });
+    var rec = {
+      v: 1, student: { nume: f[1], prenume: f[2], grupa: f[3] }, profil: p ? p.id : null,
+      exp: digits(f[4]), per: digits(f[5]), imp: imp, momente: momente,
+      global: { sat: +f[8], nps: +f[9], cuvant: f[11] || '' }, dur: { total: (+f[10]) * 60 }, ts: ''
+    };
+    rec.id = studentId(rec.student);
+    return validRec(rec) && rec.profil ? { rec: rec } : { error: 'format' };
+  }
+  function findCodes(text) { return String(text || '').match(/CAL1\.[A-Za-z0-9_-]+\.[0-9a-z]{1,4}/g) || []; }
+
   window.CAL = {
+    encodeCode: encodeCode, decodeCode: decodeCode, findCodes: findCodes,
     ids: ids, dimById: dimById, esc: esc, mean: mean, sd: sd, fmt: fmt, fmtS: fmtS, norm: norm, hash: hash,
     itemText: itemText, profileById: profileById, pickProfile: pickProfile, studentId: studentId,
     dimMeans: dimMeans, analyze: analyze, band: band, flags: flags, validRec: validRec,
