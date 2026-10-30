@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Zona profesorului</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="profesor.html" aria-label="Zona profesorului">
+    <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="6" fill="#fff"/><path d="M16 7h8v9h9v8h-9v9h-8v-9H7v-8h9z" fill="#0f5c63"/></svg>
+    <div><b>Zona profesorului</b><span>Spitalul Calitas, rezultate SERVQUAL</span></div>
+  </a>
+  <div class="sp"></div>
+  <a class="btn small" href="./" style="background:#fff">Aplicația studentului</a>
+</header>
+
+<div class="twrap">
+  <section class="card signed noprint" id="connect">
+    <div class="mini connect-mini"><span id="loadedmsg"></span><button class="btn small" id="btn-change">Schimbă sau adaugă date</button></div>
+    <div class="full">
+    <h2>Încarcă răspunsurile</h2>
+    <div class="grid2">
+      <div>
+        <h3>Din Google Sheets</h3>
+        <label class="f">Adresa colectorului (Apps Script, se termină în /exec)
+          <input type="text" id="endpoint" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
+        <label class="f">Cheia profesorului <span class="h">Cea setată în proprietățile scriptului (TEACHER_KEY)</span>
+          <input type="text" id="tkey" autocomplete="off" style="-webkit-text-security:disc"></label>
+        <button class="btn primary" id="btn-load">Încarcă din Google Sheets</button>
+      </div>
+      <div>
+        <h3>Din fișiere</h3>
+        <div class="drop" id="drop"><p style="margin:0 0 10px">Trage aici fișierele <b>.json</b> descărcate de studenți sau alege-le din calculator.</p>
+          <input type="file" id="files" accept=".json,application/json" multiple></div>
+        <p style="margin:14px 0 0"><button class="btn" id="btn-demo">Încarcă date demonstrative (48 de studenți)</button></p>
+      </div>
+    </div>
+    </div>
+    <p class="status" id="status" role="status"></p>
+  </section>
+
+  <div id="dash"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="content.js"></script>
+<script src="cheie.js" onerror="void 0"></script>
+<script src="core.js"></script>
+<script src="demo.js"></script>
+<script src="teacher.js"></script>
+</body>
+</html>
